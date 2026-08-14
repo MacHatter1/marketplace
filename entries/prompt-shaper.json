@@ -1,0 +1,15 @@
+{
+  "id": "prompt-shaper",
+  "displayName": "Prompt Improver",
+  "description": "Adds an Improve prompt action to the composer that sends your rough draft to a hidden helper agent, which applies the prompt-shaper skill to rewrite it into a clear, complete prompt and returns it in place for review before you send.",
+  "icon": "AiContentGenerator01",
+  "tags": ["agent-interaction", "prompts"],
+  "author": { "name": "BB Team", "github": "get-bb", "url": "https://getbb.app" },
+  "engines": { "bb": ">=0.0.34", "bbPluginSdk": "^0.5.0" },
+  "source": {
+    "git": {
+      "url": "https://github.com/brsbl/bb-plugins.git",
+      "ref": "1c6bb2e8ad3551466981e7eb027cc4b1f3428cac"
+    }
+  }
+}
