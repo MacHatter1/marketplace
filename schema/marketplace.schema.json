@@ -95,15 +95,6 @@
             "url": { "type": "string", "pattern": "^https://" }
           }
         },
-        "engines": {
-          "type": "object",
-          "additionalProperties": false,
-          "$comment": "May narrow the plugin manifest's ranges; BB refuses an install that widens them.",
-          "properties": {
-            "bb": { "type": "string", "minLength": 1 },
-            "bbPluginSdk": { "type": "string", "minLength": 1 }
-          }
-        },
         "source": {
           "oneOf": [
             { "$ref": "#/$defs/npmSource" },

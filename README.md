@@ -24,11 +24,11 @@ installation refreshes.
    git repository (with an optional `subdir` for multi-plugin repositories)
    or your npm package.
 3. Open a pull request. CI validates the entry; a maintainer reviews the
-   plugin itself — source, behavior, and requested engine ranges.
+   plugin itself, including its source and behavior.
 
 Approval covers the listing. With a semver `range` source you release
 updates by tagging your own repository; changing the entry itself (source
-location, name, branding, wider ranges) needs a new reviewed pull request.
+location, name, or branding) needs a new reviewed pull request.
 The account that opens the listing pull request is recorded as the owner in
 `author.github` and gates later entry changes.
 
