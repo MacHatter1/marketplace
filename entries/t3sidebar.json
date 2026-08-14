@@ -1,0 +1,17 @@
+{
+  "id": "t3sidebar",
+  "displayName": "T3 Sidebar",
+  "description": "Replaces the BB thread list with a stable inbox, snooze controls, and child thread links.",
+  "icon": "PanelLeft",
+  "tags": ["interface", "sidebar", "threads"],
+  "author": {
+    "name": "Sawyer Hood",
+    "github": "SawyerHood"
+  },
+  "source": {
+    "git": {
+      "url": "https://github.com/SawyerHood/bb-plugin-t3sidebar.git",
+      "range": "^0.1.0"
+    }
+  }
+}
