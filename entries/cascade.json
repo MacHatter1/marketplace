@@ -1,0 +1,19 @@
+{
+  "id": "cascade",
+  "displayName": "Cascade",
+  "description": "Shows active BB threads in a tiled layout with horizontal columns and vertical groups.",
+  "icon": {
+    "url": "./icons/cascade-3a4890b8.svg"
+  },
+  "tags": ["interface", "threads", "workspace"],
+  "author": {
+    "name": "Sawyer Hood",
+    "github": "SawyerHood"
+  },
+  "source": {
+    "git": {
+      "url": "https://github.com/SawyerHood/bb-plugin-cascade.git",
+      "range": "^0.1.0"
+    }
+  }
+}
