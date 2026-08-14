@@ -14,10 +14,6 @@
     "name": "Sawyer Hood",
     "github": "SawyerHood"
   },
-  "engines": {
-    "bb": ">=0.35",
-    "bbPluginSdk": ">=0.4.4"
-  },
   "source": {
     "git": {
       "url": "https://github.com/SawyerHood/bb-slop-cop.git",
