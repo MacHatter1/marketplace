@@ -2,10 +2,22 @@
   "id": "slopcop",
   "displayName": "SlopCop",
   "description": "Automated PR review rules that dispatch BB agents.",
-  "icon": { "url": "./icons/slopcop.svg" },
-  "tags": ["developer-tools", "github", "reviews"],
-  "author": { "name": "Sawyer Hood", "github": "SawyerHood" },
-  "engines": { "bb": ">=0.35", "bbPluginSdk": ">=0.4.4" },
+  "icon": {
+    "url": "./icons/slopcop-35963518.svg"
+  },
+  "tags": [
+    "developer-tools",
+    "github",
+    "reviews"
+  ],
+  "author": {
+    "name": "Sawyer Hood",
+    "github": "SawyerHood"
+  },
+  "engines": {
+    "bb": ">=0.35",
+    "bbPluginSdk": ">=0.4.4"
+  },
   "source": {
     "git": {
       "url": "https://github.com/SawyerHood/bb-slop-cop.git",
