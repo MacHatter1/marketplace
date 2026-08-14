@@ -4,7 +4,7 @@
   "description": "Adds an Improve prompt action to the composer that sends your rough draft to a hidden helper agent, which applies the prompt-shaper skill to rewrite it into a clear, complete prompt and returns it in place for review before you send.",
   "icon": "AiContentGenerator01",
   "tags": ["agent-interaction", "prompts"],
-  "author": { "name": "BB Team", "github": "get-bb", "url": "https://getbb.app" },
+  "author": { "name": "Bersabel Tadesse", "github": "brsbl" },
   "source": {
     "git": {
       "url": "https://github.com/brsbl/bb-plugins.git",
