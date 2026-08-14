@@ -1,6 +1,7 @@
-# BB Official plugin marketplace
+# BB Community plugin marketplace
 
-The registry for the BB Official plugin marketplace. Merges to `main`
+The registry for the BB Community plugin marketplace, which BB registers
+under the reserved name `bb-official`. Merges to `main`
 publish `https://getbb.app/marketplace/v1/marketplace.json`, which every BB
 installation refreshes.
 
