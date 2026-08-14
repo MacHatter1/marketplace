@@ -64,18 +64,38 @@ if (liveness) {
     const source = entry.source ?? {};
     try {
       if (source.git) {
-        const { url, ref } = source.git;
-        const out = execFileSync("git", ["ls-remote", url, ref, `${ref}^{}`], {
-          encoding: "utf8",
-          timeout: 30_000,
-        });
-        const isCommit = /^[0-9a-f]{7,40}$/i.test(ref);
-        if (!isCommit && out.trim().length === 0) {
-          problems.push(`${entry.id}: git ref "${ref}" not found at ${url}`);
-        }
-        if (isCommit) {
-          // ls-remote cannot list arbitrary commits; verify the repo answers at all.
-          execFileSync("git", ["ls-remote", url, "HEAD"], { encoding: "utf8", timeout: 30_000 });
+        const { url, ref, range, tagPrefix } = source.git;
+        if (range !== undefined) {
+          const prefix = tagPrefix ?? "";
+          const out = execFileSync(
+            "git",
+            ["ls-remote", "--tags", url, `refs/tags/${prefix}v*`],
+            { encoding: "utf8", timeout: 30_000 },
+          );
+          const tagPattern = new RegExp(
+            `refs/tags/${prefix.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&")}(v\\d+\\.\\d+\\.\\d+)(\\^\\{\\})?$`,
+          );
+          const hasTag = out
+            .split("\n")
+            .some((line) => tagPattern.test(line.trim()));
+          if (!hasTag) {
+            problems.push(
+              `${entry.id}: no ${prefix}vX.Y.Z tags found at ${url} for range "${range}"`,
+            );
+          }
+        } else {
+          const out = execFileSync("git", ["ls-remote", url, ref, `${ref}^{}`], {
+            encoding: "utf8",
+            timeout: 30_000,
+          });
+          const isCommit = /^[0-9a-f]{7,40}$/i.test(ref);
+          if (!isCommit && out.trim().length === 0) {
+            problems.push(`${entry.id}: git ref "${ref}" not found at ${url}`);
+          }
+          if (isCommit) {
+            // ls-remote cannot list arbitrary commits; verify the repo answers at all.
+            execFileSync("git", ["ls-remote", url, "HEAD"], { encoding: "utf8", timeout: 30_000 });
+          }
         }
       } else if (source.npm) {
         execFileSync("npm", ["view", source.npm.package, "name"], {
