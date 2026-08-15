@@ -3,7 +3,7 @@
   "displayName": "Cascade",
   "description": "Shows active BB threads in a tiled layout with horizontal columns and vertical groups.",
   "icon": {
-    "url": "./icons/cascade-3a4890b8.svg"
+    "url": "./icons/cascade-7b651515.svg"
   },
   "tags": ["interface", "threads", "workspace"],
   "author": {
