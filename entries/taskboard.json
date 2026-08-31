@@ -1,0 +1,29 @@
+{
+  "id": "taskboard",
+  "displayName": "Taskboard",
+  "description": "Browses and creates project-scoped GitHub, Linear, or Jira issues in one focused List or Kanban board, with explicit review before creation.",
+  "icon": {
+    "url": "./icons/taskboard-0b77950c.svg"
+  },
+  "tags": [
+    "tasks",
+    "project-management",
+    "kanban",
+    "github",
+    "linear",
+    "jira"
+  ],
+  "author": {
+    "name": "Mateo Cerquetella",
+    "github": "MateoCerquetella",
+    "url": "https://github.com/MateoCerquetella"
+  },
+  "source": {
+    "git": {
+      "url": "https://github.com/MateoCerquetella/bb-plugins.git",
+      "subdir": "plugins/taskboard",
+      "range": "^0.3.3",
+      "tagPrefix": "taskboard/"
+    }
+  }
+}
