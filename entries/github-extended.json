@@ -1,0 +1,26 @@
+{
+  "id": "github-extended",
+  "displayName": "GitHub Extended",
+  "description": "Browses cached GitHub issues, pull requests, and Dependabot alerts in BB with thread actions and agent-assisted work.",
+  "icon": {
+      "url": "./icons/github-extended-783a31ff.svg"
+  },
+  "tags": [
+    "github",
+    "issues",
+    "pull-requests",
+    "dependabot",
+    "developer-tools"
+  ],
+  "author": {
+    "name": "Tom",
+    "github": "MacHatter1",
+    "url": "https://github.com/MacHatter1"
+  },
+  "source": {
+    "git": {
+      "url": "https://github.com/MacHatter1/bb-plugin-github-extended.git",
+      "range": "^0.1.1"
+    }
+  }
+}
