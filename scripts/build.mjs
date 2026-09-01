@@ -1,61 +1,245 @@
 #!/usr/bin/env node
-// Compose entries/*.json + marketplace.base.json into dist/marketplace.json,
-// validating against schema/marketplace.schema.json. Exits non-zero on any
-// problem so CI can gate PRs. `--liveness` additionally checks that each git
-// source ref exists and each npm package is published.
+// Build the frozen v1 document and the full v2 document from one source.
+// The --liveness option also checks each remote source.
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import Ajv from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
+import {
+  checkRequiredCategories,
+  findOrphanScreenshotFiles,
+  fillEmptyCollections,
+  parseEntryAddedDates,
+  projectV1Manifest,
+  pullRequestEntryFiles,
+  validateAndRewriteIcon,
+  validateScreenshotReference,
+} from "./marketplace-lib.mjs";
 
-const root = new URL("..", import.meta.url).pathname;
+const root = fileURLToPath(new URL("..", import.meta.url));
 const liveness = process.argv.includes("--liveness");
 const problems = [];
+const warnings = [];
 
 const readJson = (path) => JSON.parse(readFileSync(path, "utf8"));
 const base = readJson(join(root, "marketplace.base.json"));
+const v1Schema = readJson(join(root, "schema", "marketplace.schema.json"));
+const v2Schema = readJson(join(root, "schema", "marketplace-v2.schema.json"));
+
+const ajv = new Ajv({ allErrors: true, strict: false });
+addFormats(ajv);
+const validateV1 = ajv.compile(v1Schema);
+const validateV2 = ajv.compile(v2Schema);
+const validateEntry = ajv.compile({
+  ...v2Schema.$defs.entry,
+  $defs: v2Schema.$defs,
+});
 
 const entryFiles = readdirSync(join(root, "entries"))
   .filter((name) => name.endsWith(".json"))
   .sort();
-if (entryFiles.length === 0) problems.push("entries/ contains no entry files");
+if (entryFiles.length === 0) {
+  problems.push("The entries directory has no entry files.");
+}
 
-const seen = new Set();
-const plugins = [];
+const seenPluginIds = new Set();
+const entryRecords = [];
 for (const file of entryFiles) {
   const path = join(root, "entries", file);
   let entry;
   try {
     entry = readJson(path);
   } catch (error) {
-    problems.push(`${file}: invalid JSON (${error.message})`);
+    problems.push(`${file}: The JSON is not valid. ${error.message}`);
     continue;
   }
+
   const expectedId = file.replace(/\.json$/, "");
   if (entry.id !== expectedId) {
-    problems.push(`${file}: id "${entry.id}" must equal the filename "${expectedId}"`);
+    problems.push(`${file}: The id must be "${expectedId}".`);
   }
-  if (seen.has(entry.id)) problems.push(`${file}: duplicate id "${entry.id}"`);
-  seen.add(entry.id);
-  if (typeof entry.icon === "object" && entry.icon?.url?.startsWith("./")) {
-    try {
-      readFileSync(join(root, entry.icon.url));
-    } catch {
-      problems.push(`${file}: relative icon "${entry.icon.url}" does not exist`);
+  if (seenPluginIds.has(entry.id)) {
+    problems.push(`${file}: The id "${entry.id}" occurs more than once.`);
+  }
+  seenPluginIds.add(entry.id);
+
+  if (!validateEntry(entry)) {
+    for (const error of validateEntry.errors ?? []) {
+      problems.push(`${file}: ${error.instancePath || "/"} ${error.message}`);
     }
   }
-  plugins.push(entry);
+  entryRecords.push({ entry, file });
 }
 
-const manifest = { $schema: "https://getbb.app/schemas/marketplace.schema.json", ...base, plugins };
+function changedPullRequestEntryFiles() {
+  const eventPath = process.env.GITHUB_EVENT_PATH;
+  if (eventPath === undefined) return [];
 
-const ajv = new Ajv({ allErrors: true, strict: false });
-addFormats(ajv);
-const validate = ajv.compile(readJson(join(root, "schema", "marketplace.schema.json")));
-if (!validate(manifest)) {
-  for (const error of validate.errors ?? []) {
-    problems.push(`schema: ${error.instancePath || "/"} ${error.message}`);
+  let event;
+  try {
+    event = readJson(eventPath);
+  } catch (error) {
+    problems.push(`The GitHub event file is not valid JSON. ${error.message}`);
+    return [];
+  }
+  try {
+    return pullRequestEntryFiles(root, event);
+  } catch (error) {
+    const reason = error.message.split("\n")[0];
+    problems.push(`The build cannot find changed entry files. ${reason}`);
+    return [];
+  }
+}
+
+const categoryPolicy = checkRequiredCategories(
+  entryRecords,
+  changedPullRequestEntryFiles(),
+);
+for (const file of categoryPolicy.errors) {
+  problems.push(`${file}: A new or changed entry must have a category.`);
+}
+if (categoryPolicy.warnings.length > 0) {
+  warnings.push(
+    `${categoryPolicy.warnings.length} unchanged entry files have no category.`,
+  );
+}
+
+const categoryIds = new Set();
+for (const category of base.categories ?? []) {
+  if (categoryIds.has(category.id)) {
+    problems.push(
+      `marketplace.base.json: The category id "${category.id}" occurs more than once.`,
+    );
+  }
+  categoryIds.add(category.id);
+}
+
+const collectionIds = new Set();
+for (const collection of base.collections ?? []) {
+  if (collectionIds.has(collection.id)) {
+    problems.push(
+      `marketplace.base.json: The collection id "${collection.id}" occurs more than once.`,
+    );
+  }
+  collectionIds.add(collection.id);
+  for (const pluginId of collection.pluginIds ?? []) {
+    if (!seenPluginIds.has(pluginId)) {
+      problems.push(
+        `marketplace.base.json: The collection "${collection.id}" names the unknown plugin "${pluginId}".`,
+      );
+    }
+  }
+}
+
+const plugins = entryRecords.map(({ entry }) => entry);
+for (const entry of plugins) {
+  if (entry.category !== undefined && !categoryIds.has(entry.category)) {
+    problems.push(`${entry.id}.json: The category "${entry.category}" is not defined.`);
+  }
+}
+
+const referencedScreenshotFiles = new Set();
+const v2Plugins = plugins.map((entry) => {
+  const output = { ...entry };
+  const iconResult = validateAndRewriteIcon(root, entry.icon);
+  output.icon = iconResult.icon;
+  for (const problem of iconResult.problems) {
+    problems.push(`${entry.id}.json: ${problem}`);
+  }
+
+  if (entry.screenshots !== undefined) {
+    output.screenshots = entry.screenshots.map((reference) => {
+      const result = validateScreenshotReference(root, entry.id, reference);
+      for (const problem of result.problems) {
+        problems.push(`${entry.id}.json: ${problem}`);
+      }
+      if (result.relativeFile !== undefined) {
+        referencedScreenshotFiles.add(result.relativeFile);
+      }
+      return result.outputUrl;
+    });
+  }
+  return output;
+});
+
+for (const file of findOrphanScreenshotFiles(root, referencedScreenshotFiles)) {
+  problems.push(`${file}: No marketplace entry references this screenshot file.`);
+}
+
+function entryAddedDates() {
+  const needsFallback = (base.collections ?? []).some(
+    (collection) => collection.pluginIds?.length === 0,
+  );
+  if (!needsFallback) return new Map();
+
+  try {
+    const shallow = execFileSync(
+      "git",
+      ["-C", root, "rev-parse", "--is-shallow-repository"],
+      { encoding: "utf8", timeout: 30_000 },
+    ).trim();
+    if (shallow === "true") {
+      problems.push(
+        "The repository is shallow. The build needs full Git history for the new-and-notable collection.",
+      );
+      return new Map();
+    }
+    const output = execFileSync(
+      "git",
+      [
+        "-C",
+        root,
+        "log",
+        "--diff-filter=A",
+        "--follow",
+        "--format=date:%cI",
+        "--name-only",
+        "--",
+        "entries/",
+      ],
+      { encoding: "utf8", timeout: 30_000 },
+    );
+    const dates = parseEntryAddedDates(output);
+    for (const { entry, file } of entryRecords) {
+      if (entry.publishedAt === undefined && !dates.has(entry.id)) {
+        problems.push(`${file}: The Git history has no first addition date.`);
+      }
+    }
+    return dates;
+  } catch (error) {
+    const reason = error.message.split("\n")[0];
+    problems.push(`The build cannot read entry addition dates. ${reason}`);
+    return new Map();
+  }
+}
+
+const collections = fillEmptyCollections(
+  base.collections ?? [],
+  v2Plugins,
+  entryAddedDates(),
+);
+const v1Manifest = projectV1Manifest(base, plugins);
+const v2Manifest = {
+  $schema: "https://getbb.app/schemas/marketplace-v2.schema.json",
+  schemaVersion: 2,
+  name: base.name,
+  displayName: base.displayName,
+  ...(base.description === undefined ? {} : { description: base.description }),
+  ...(base.categories === undefined ? {} : { categories: base.categories }),
+  ...(base.collections === undefined ? {} : { collections }),
+  plugins: v2Plugins,
+};
+
+if (!validateV1(v1Manifest)) {
+  for (const error of validateV1.errors ?? []) {
+    problems.push(`v1 schema: ${error.instancePath || "/"} ${error.message}`);
+  }
+}
+if (!validateV2(v2Manifest)) {
+  for (const error of validateV2.errors ?? []) {
+    problems.push(`v2 schema: ${error.instancePath || "/"} ${error.message}`);
   }
 }
 
@@ -72,15 +256,19 @@ if (liveness) {
             ["ls-remote", "--tags", url, `refs/tags/${prefix}v*`],
             { encoding: "utf8", timeout: 30_000 },
           );
+          const escapedPrefix = prefix.replaceAll(
+            /[.*+?^${}()|[\]\\]/g,
+            "\\$&",
+          );
           const tagPattern = new RegExp(
-            `refs/tags/${prefix.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&")}(v\\d+\\.\\d+\\.\\d+)(\\^\\{\\})?$`,
+            `refs/tags/${escapedPrefix}(v\\d+\\.\\d+\\.\\d+)(\\^\\{\\})?$`,
           );
           const hasTag = out
             .split("\n")
             .some((line) => tagPattern.test(line.trim()));
           if (!hasTag) {
             problems.push(
-              `${entry.id}: no ${prefix}vX.Y.Z tags found at ${url} for range "${range}"`,
+              `${entry.id}: The source has no ${prefix}vX.Y.Z tag for "${range}".`,
             );
           }
         } else {
@@ -90,11 +278,13 @@ if (liveness) {
           });
           const isCommit = /^[0-9a-f]{7,40}$/i.test(ref);
           if (!isCommit && out.trim().length === 0) {
-            problems.push(`${entry.id}: git ref "${ref}" not found at ${url}`);
+            problems.push(`${entry.id}: The git ref "${ref}" does not exist.`);
           }
           if (isCommit) {
-            // ls-remote cannot list arbitrary commits; verify the repo answers at all.
-            execFileSync("git", ["ls-remote", url, "HEAD"], { encoding: "utf8", timeout: 30_000 });
+            execFileSync("git", ["ls-remote", url, "HEAD"], {
+              encoding: "utf8",
+              timeout: 30_000,
+            });
           }
         }
       } else if (source.npm) {
@@ -104,21 +294,38 @@ if (liveness) {
         });
       }
     } catch (error) {
-      problems.push(`${entry.id}: liveness check failed (${error.message.split("\n")[0]})`);
+      const reason = error.message.split("\n")[0];
+      problems.push(`${entry.id}: The source check failed. ${reason}`);
     }
   }
 }
 
+for (const warning of warnings) console.warn(`warning: ${warning}`);
 if (problems.length > 0) {
   for (const problem of problems) console.error(`error: ${problem}`);
   process.exit(1);
 }
 
-const bytes = JSON.stringify(manifest, null, 2) + "\n";
-if (Buffer.byteLength(bytes, "utf8") > 1_048_576) {
-  console.error("error: composed manifest exceeds 1 MiB");
-  process.exit(1);
+const outputs = [
+  ["marketplace.json", v1Manifest],
+  ["v2/marketplace.json", v2Manifest],
+];
+for (const [label, manifest] of outputs) {
+  const bytes = `${JSON.stringify(manifest, null, 2)}\n`;
+  if (Buffer.byteLength(bytes, "utf8") > 1_048_576) {
+    console.error(`error: The ${label} document is larger than 1 MiB.`);
+    process.exit(1);
+  }
 }
-mkdirSync(join(root, "dist"), { recursive: true });
-writeFileSync(join(root, "dist", "marketplace.json"), bytes);
+
+mkdirSync(join(root, "dist", "v2"), { recursive: true });
+writeFileSync(
+  join(root, "dist", "marketplace.json"),
+  `${JSON.stringify(v1Manifest, null, 2)}\n`,
+);
+writeFileSync(
+  join(root, "dist", "v2", "marketplace.json"),
+  `${JSON.stringify(v2Manifest, null, 2)}\n`,
+);
 console.log(`built dist/marketplace.json with ${plugins.length} entries`);
+console.log(`built dist/v2/marketplace.json with ${plugins.length} entries`);
