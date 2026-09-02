@@ -14,6 +14,7 @@
     "quota",
     "xai"
   ],
+  "category": "token-usage-and-limits",
   "author": {
     "name": "Tom",
     "github": "MacHatter1",
