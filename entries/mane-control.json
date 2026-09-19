@@ -1,18 +1,26 @@
 {
   "id": "mane-control",
   "displayName": "Mane Control",
-  "description": "Switches Ponytail modes from the BB thread composer and shows the current mode on the control.",
+  "description": "Flips Ponytail between Off, Lite, Full, and Ultra from a horse button beside the composer. Choosing a mode sends /ponytail into the thread and keeps the active mode on the control. Mode-command messages render as compact Ponytail status pills in the transcript. Requires the Ponytail skill for the thread's provider—plugin, user skill, or registry install such as skills.sh.",
   "icon": {
     "url": "./icons/mane-control-45b639fa.svg"
   },
-  "tags": ["composer", "interface", "ponytail", "threads", "workflow"],
+  "overview": "./overview/mane-control.md",
+  "tags": [
+    "composer",
+    "ponytail",
+    "modes",
+    "slash-commands",
+    "threads",
+    "workflow",
+    "skills"
+  ],
   "category": "tasks-and-workflows",
   "author": {
     "name": "MacHatter1",
     "github": "MacHatter1",
     "url": "https://github.com/MacHatter1"
   },
-  "category": "tasks-and-workflows",
   "source": {
     "git": {
       "url": "https://github.com/MacHatter1/bb-plugin-mane-control.git",
